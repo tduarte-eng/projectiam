@@ -13,10 +13,10 @@ from typing import List
 from datetime import datetime
 import os
 import asyncio
-
+from typing import Tuple, Any
+import json
 
 # Modelo Pydantic corrigido para o output do agente de entrada
-# Criar modelos Pydantic específicos para cada tipo de saída
 class ClassificacaoOutput(BaseModel):
     agente: str = Field(..., description="Nome do agente que processou a entrada")
     saida: str = Field(..., description="Saída gerada pelo agente")
@@ -32,48 +32,17 @@ class ArtefatosOutput(BaseModel):
 class EventOutput(BaseModel):
     events: List[str] = Field(..., description="Lista de eventos detectados")
 
-# Funções de condição para as conditional tasks
-def deve_executar_boas_vindas(output: TaskOutput) -> bool:
-    """Verifica se o agente de entrada delegou para o Agente de boas-vindas"""
-    try:
-        if hasattr(output, 'pydantic') and output.pydantic:
-            agente = str(output.pydantic.agente).strip()
-            return "Agente de boas-vindas" in agente
-        # Fallback: verifica na saída raw
-        if hasattr(output, 'raw'):
-            return "Agente de boas-vindas" in str(output.raw)
-        return False
-    except Exception as e:
-        print(f"Erro na condição boas-vindas: {e}")
-        return False
+#def validate_routing_output(result: TaskOutput) -> Tuple[bool, Any]:
+#    """
+#    Valida se a saída do agente de entrada está no formato correto e com valores válidos.
+#    Inclui validação de agentes e tasks disponíveis no sistema.
+#    """
+#    try:
+#        resultado = "{"agente": "Agente de boas-vindas", "saida": "oi"}"
+#        return (True, resultado)
+#    except Exception as e:
+#       return (False, {"error": str(e)})
 
-def deve_executar_analise_codigo(output: TaskOutput) -> bool:
-    """Verifica se o agente de entrada delegou para o Analista de Codigo"""
-    try:
-        if hasattr(output, 'pydantic') and output.pydantic:
-            agente = str(output.pydantic.agente).strip()
-            return "Analista de Codigo" in agente
-        # Fallback: verifica na saída raw
-        if hasattr(output, 'raw'):
-            return "Analista de Codigo" in str(output.raw)
-        return False
-    except Exception as e:
-        print(f"Erro na condição análise código: {e}")
-        return False
-
-def deve_executar_categorizacao_artefatos(output: TaskOutput) -> bool:
-    """Verifica se o agente de entrada delegou para o Agente de Artefatos de Tecnologia"""
-    try:
-        if hasattr(output, 'pydantic') and output.pydantic:
-            agente = str(output.pydantic.agente).strip()
-            return "Agente de Artefatos de Tecnologia" in agente
-        # Fallback: verifica na saída raw
-        if hasattr(output, 'raw'):
-            return "Agente de Artefatos de Tecnologia" in str(output.raw)
-        return False
-    except Exception as e:
-        print(f"Erro na condição categorização: {e}")
-        return False
 
 @CrewBase
 class Crew_inicial:
@@ -135,7 +104,7 @@ class Crew_inicial:
 
     @agent
     def agente_de_entrada(self) -> Agent:
-        return Agent(config=self.agents_config['agente_de_entrada'], verbose=True)
+        return Agent(config=self.agents_config['agente_de_entrada'], verbose=True, allow_delegation=True)
 
     @agent
     def agente_boas_vindas(self) -> Agent:
@@ -161,34 +130,45 @@ class Crew_inicial:
     def especialista_integracao(self) -> Agent:
         return Agent(config=self.agents_config['especialista_integracao'], verbose=True)
 
+    # Task de entrada - sempre executada
     @task
     def analise_de_entrada_task(self) -> Task:
         return Task(
             config=self.tasks_config['analise_de_entrada_task'],
-            output_pydantic=ClassificacaoOutput)
+            agent=self.agente_de_entrada(),
+#            guardrail=validate_routing_output
+        )
 
+    # Task de boas-vindas - usa o output da task de entrada
     @task
-    def analise_boas_vindas_task(self) ->Task:
+    def analise_boas_vindas_task(self) -> Task:
         return Task(
             config=self.tasks_config['analise_boas_vindas_task'],
+            agent=self.agente_boas_vindas(),
+            context=[self.analise_de_entrada_task()],
             output_pydantic=ClassificacaoOutput
         )
     
+    # Task de análise de código - usa o output da task de entrada
     @task
     def analise_codigo_task(self) -> Task:
         return Task(
             config=self.tasks_config['analise_codigo_task'],
+            agent=self.agente_analista_codigo(),
+            context=[self.analise_de_entrada_task()],
             output_pydantic=AnaliseCodigoOutput
         )
 
+    # Task de categorização de artefatos - usa o output da task de entrada
     @task
     def categorizar_artefatos_task(self) -> Task:
-        """Task condicional para execução apenas quando delegada"""
         return Task(
             config=self.tasks_config['categorizar_artefatos_task'],
+            agent=self.agente_categorizador_de_artefatos(),
+            context=[self.analise_de_entrada_task()],
             output_pydantic=ArtefatosOutput
         )
-
+    
     @task
     def analisar_linguagem_task(self) -> Task:
         return Task(config=self.tasks_config['analisar_linguagem_task'])
@@ -207,13 +187,19 @@ class Crew_inicial:
     #print(self.api_key, self.model_name, self.max_tokens, self.temperature, self.top_p)
 
         project_crew = Crew(
-            agents=[self.agente_boas_vindas(),
+            agents=[
+#                self.agente_de_entrada(),
+                self.agente_boas_vindas(),
                 self.agente_analista_codigo(),
-                self.agente_categorizador_de_artefatos()
+                self.agente_categorizador_de_artefatos(),
             ],
-            tasks=[self.analise_boas_vindas_task(),
-                self.analise_codigo_task(),
-                self.categorizar_artefatos_task()
+            tasks=[
+                # 1. Task de entrada sempre executa
+                self.analise_de_entrada_task(),
+                # 2. Tasks específicas que recebem o contexto da entrada
+                self.analise_boas_vindas_task(),
+                self.analise_codigo_task(), 
+                self.categorizar_artefatos_task(),
             ],
 #            process=Process.sequential,
             verbose=True,
@@ -222,7 +208,8 @@ class Crew_inicial:
 #            manager_llm='azure/bnb-gpt-4.1',
             #verbose=True,
 #            planning_llm="azure/bnb-gpt-4.1",
-            planning=True,
+#            planning_key=self.api_key,
+#            planning=True,
             api_key=self.api_key,
             api_base=self.api_base,
             api_version=self.api_version,
@@ -234,4 +221,3 @@ class Crew_inicial:
         )
         # You can also see how the task description gets formatted
         return project_crew
-        

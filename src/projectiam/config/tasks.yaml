@@ -1,23 +1,34 @@
 analise_de_entrada_task:
   description: >
-    Analisar a entrada: {topic}
-    
-    Classificar em uma das categorias:
-    1. Lista de artefatos técnicos → Delegar para Agente de Artefatos de Tecnologia
-    2. Tudo que não for artefato técnico ou código de programação. → Delegar para Agente de boas-vindas  
-    3. Código de programação → Delegar para Analista de Codigo
-    
-    IMPORTANTE: Após a classificação, gerar APENAS a decisão de roteamento no formato JSON.
+    Input = {topic}
+    Analisar a entrada recebida e classificá-la em uma das categorias:
+
+    1. Lista de artefatos técnicos → "Agente de Artefatos de Tecnologia"
+    2. Código de programação → "Analista de Codigo"
+    3. Saudações ou conteúdo não técnico → "Agente de boas-vindas"
+
+    Após a classificação, gerar APENAS a decisão de roteamento no formato JSON exato:
+
+    {"agente": "[nome do agente delegado]", "saida": "[input original]"}
+
+    REGRAS:
+    - Use EXATAMENTE os nomes: "Agente de Artefatos de Tecnologia", "Analista de Codigo", "Agente de boas-vindas"
+    - No campo "agente", sempre use o nome do agente delegado
+    - No campo "saida", insira o input original recebido
   expected_output: >
-    Resposta em formato JSON válido identificando o agente apropriado:
+    Saída em formato JSON válido, com os campos:
+    - "agente": nome do agente delegado
+    - "saida": input original
+
     Exemplos:
-    { "agente": "Agente de Artefatos de Tecnologia", "saida": Delegar para Agente de Artefatos de Tecnologia" }
-    { "agente": "Agente de boas-vindas", "saida": "Entrada é uma saudação ou não contém conteúdo técnico" }
-    { "agente": "Analista de Codigo", "saida": Delegar para Analista de Codigo }
+    {"agente": "Agente de Artefatos de Tecnologia", "saida": "[input original]"}
+    {"agente": "Analista de Codigo", "saida": "[input original]"}
+    {"agente": "Agente de boas-vindas", "saida": "[input original]"}
   agent: agente_de_entrada
 
 analise_boas_vindas_task:
   description: >
+    EXECUTE APENAS SE o agente indicado for "Agente de boas-vindas".
     Responda SEMPRE que você IA de modernização de TI  e que necessita de uma entrada técnica para analisar.
     Use uma linguagem simples e clara.
     Mantenha um tom positivo e encorajador, incentivando os usuários a continuarem a interação.
@@ -45,14 +56,15 @@ analise_boas_vindas_task:
 
 analise_codigo_task:
   description: >
-    *Entrada* = {topic}
-    Identifique a linguagem de programação, frameworks e práticas de desenvolvimento utilizadas.
-    Avalie a modernidade do código com base em critérios como:
-      - Uso de versões recentes da linguagem
-      - Adoção de frameworks modernos
-      - Implementação de testes automatizados
-      - Aderência a padrões de codificação atuais
-      - Utilização de práticas de segurança no código
+    EXECUTE APENAS SE o agente indicado for "Analista de Codigo".
+    Avalie {topic} como um trecho de código de programação.
+      Identifique a linguagem de programação, frameworks e práticas de desenvolvimento utilizadas.
+      Avalie a modernidade do código com base em critérios como:
+        - Uso de versões recentes da linguagem
+        - Adoção de frameworks modernos
+        - Implementação de testes automatizados
+        - Aderência a padrões de codificação atuais
+        - Utilização de práticas de segurança no código
     Forneça uma análise detalhada e técnica do código, destacando pontos fortes e áreas para melhoria.
   expected_output: >
     {"agente": "Analista de Codigo", "saida": "🔍 Análise Técnica do Código:\n\n📌 Linguagem de Programação Identificada: Python 3.11\n📦 Frameworks Utilizados:\n  - FastAPI (para construção de APIs modernas e assíncronas)\n  - Pydantic (validação de dados)\n  - pytest (testes automatizados)\n✅ Avaliação de Modernidade\n  | Critério | Avaliação |\n  |----------|----------|\n  | **Versão da linguagem** | Utiliza Python 3.11, versão estável e recente |\n  | **Frameworks modernos** | FastAPI e Pydantic são amplamente adotados |\n  | **Testes automatizados** | Presença de testes com pytest |\n🧠 Pontos Fortes\n  Uso de tipagem estática, estrutura modular clara\n⚠️ Áreas para Melhoria\n  Segurança: ausência de autenticação/autorização\n📈 Recomendações\n  Implementar autenticação JWT, adicionar docstrings"}
@@ -65,6 +77,9 @@ analise_codigo_task:
 
 categorizar_artefatos_task:
   description: >
+    Baseado na decisão do agente de entrada: {analise_de_entrada_task.output.raw}
+    EXECUTE APENAS SE o agente indicado for "Agente de Artefatos de Tecnologia".
+
     Recebe uma lista de artefatos técnicos, tecnologias, frameworks ou linguagens de programação.
     Identifique e Categorize os artefatos da *ENTRADA* nas seguintes categorias:
         - Linguagem de Programação
@@ -72,19 +87,21 @@ categorizar_artefatos_task:
         - Infraestrutura
         - Banco de Dados
         - DevSecOps / Governança
-      Se houver versão do artefato, inclua-a.
+      Inclua-a a versão do Artefato.
       SEMPRE deve seguir ORDEM de CATEGORIA
       Não gere recomendações. Não forneça explicações.
       A saída deve ser uma tabela de categorização conforme o exemplo abaixo:
         Uma linha por categoria, mesmo que não se aplique.
         Use "(Nenhum)" na coluna de Artefatos se a categoria não se aplicar.
+    IMPORTANTE: 
+      - A resposta deve ser um JSON válido com os campos "agente" e "saida"
+      - O campo "saida" deve conter a tabela markdown como string
+      - Use \n para quebras de linha na tabela
+      - Mantenha sempre as 5 categorias na ordem especificada
+      - Use "(Nenhum)" se não houver artefatos para uma categoria
+      - SEMPRE use os campos CATEGORIA e ARTEFATOS na tabela;
   expected_output: >
-    Por Exemplo:
-    Entrada: 
-      S659	NÃO		DB2 S659	NÃO		SQL SERVER 2019 S659	NÃO		SQL SERVER 2016 S659	NÃO		DB2 S659	NÃO		SQL SERVER 2019
-      S659	NÃO		SQL SERVER 2016 S659	NÃO	Java	Jboss S659	NÃO	React/ReactNative	nginx S659	NÃO	Java	WebSphere v.8.5
-      S659	NÃO	Java	Java 11 S659	NÃO	Java	Java 8 S659	NÃO	React/ReactNative	TypeScript
-    Saída:   
+    Usar sempre esse Modelo de Saída:   
     {"agente": "Agente de Artefatos de Tecnologia", "saida": "\n
     | Categoria | Artefatos |\n
     |---------------------------|----------|\n
@@ -103,14 +120,6 @@ categorizar_artefatos_task:
     | Infraestrutura | AWS, Azure, Docker, Kubernetes |\n
     | Banco de Dados | PostgreSQL, NoSQL |\n
     | DevSecOps / Governança | Terraform, Ansible, GitOps |"}
-    
-    
-    IMPORTANTE: 
-    - A resposta deve ser um JSON válido com os campos "agente" e "saida"
-    - O campo "saida" deve conter a tabela markdown como string
-    - Use \n para quebras de linha na tabela
-    - Mantenha sempre as 5 categorias na ordem especificada
-    - Use "(Nenhum)" se não houver artefatos para uma categoria
   agent: agente_categorizador_de_artefatos
   context: 
     - analise_de_entrada_task

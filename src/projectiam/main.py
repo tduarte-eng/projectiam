@@ -9,7 +9,9 @@ from pydantic import BaseModel
 from datetime import datetime
 from loaders import *
 from langchain_community.chat_message_histories import ChatMessageHistory
-from crew_inicial import Crew_inicial
+#from crew_inicial import Crew_inicial
+from teste  import AnaliseArtefatosFlow, run_flow
+import asyncio
 #from crew_analise2 import Project_2
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
@@ -79,44 +81,36 @@ def carrega_varios_arquivos(tipo_arquivo, arquivos):
 def chamar_crew(api_key, model_name, mensagens, max_tokens=10000, temperature=1.0, top_p=1.0):
     #api_key = os.getenv("AZURE_API_KEY")
     print(api_key, model_name, api_base, api_version, max_tokens, temperature, top_p)
-    # Instancia o projeto passando todas as variáveis
-    projeto = Crew_inicial(
-        api_key,
-        api_base,
-        api_version,
-        model_name,
-        max_tokens,
-        temperature,
-        top_p
-    )
+    # Prepara os inputs para o fluxo
+    topic = ""
+    if isinstance(mensagens, list):
+        # Extrai o conteúdo de todas as mensagens em um único texto
+        for nome, conteudo in mensagens:
+            topic += f"\n[{nome}]: {conteudo}"
+    else:
+        # Se for apenas uma string, usa diretamente
+        topic = mensagens
     
+    # Prepara os inputs no formato esperado por run_flow
     inputs = {
-        'topic': mensagens[0][1],
+        'topic': topic,
         'current_year': str(datetime.now().year)
     }
-    # Executa o Crew
-    resultado = projeto.crew().kickoff(inputs=inputs)
-    title = resultado.pydantic.agente
-    resposta = resultado.pydantic.saida
-    if title == "Agente de Artefatos de Tecnologia":
-        #sresposta = "Olá! Entrarei no fluxo de Agente de Artefatos de Tecnologia"
-        return resposta
-        #projeto2 = Project_2(
-        #    api_key,
-        #    api_base,
-        #    api_version,
-        #    model_name,
-        #    max_tokens,
-        #    temperature,
-        #    top_p
-        #)
-        #resultado2 = projeto2.crew().kickoff(inputs=inputs)
-        #resposta = resultado2.pydantic.saida   
-
-    else:
-        return resposta
-    #print(resultado)
-
+    
+    # Configura o fluxo de análise com as credenciais e parâmetros
+    AnaliseArtefatosFlow.configure(
+        api_key=api_key,
+        api_base=api_base,
+        api_version=api_version,
+        model_name=model_name,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p
+    )
+    
+    # Executa o fluxo diretamente com os inputs
+    resposta = asyncio.run(run_flow(inputs))
+    return resposta
 
 def pagina_chat():
     st.header('🤖 Bem-vindo ao IAM (IA de Modernização)', divider=True)
