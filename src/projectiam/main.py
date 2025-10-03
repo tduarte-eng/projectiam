@@ -92,9 +92,9 @@ def chamar_crew(api_key, model_name, mensagens, max_tokens=10000, temperature=1.
         topic = mensagens
     
     # Prepara os inputs no formato esperado por run_flow
-    inputs = {
-        'topic': topic,
-        'current_year': str(datetime.now().year)
+    topic = {
+        'input': topic
+        #        'current_year': str(datetime.now().year)
     }
     
     # Configura o fluxo de análise com as credenciais e parâmetros
@@ -109,7 +109,7 @@ def chamar_crew(api_key, model_name, mensagens, max_tokens=10000, temperature=1.
     )
     
     # Executa o fluxo diretamente com os inputs
-    resposta = asyncio.run(run_flow(inputs))
+    resposta = asyncio.run(run_flow(topic))
     return resposta
 
 def pagina_chat():
@@ -153,7 +153,7 @@ def pagina_chat():
         documentos.append(("InputUsuario", input_usuario))
 
         for nome, conteudo in documentos:
-            print(f"Nome: {nome}\nConteúdo:\n{conteudo}\n{'-'*40}")
+            print(f"Nome: {nome}\nConteudo:\n{conteudo}\n{'-'*40}")
 
         if documentos:
             resposta = chamar_crew(api_key, modelo, documentos)

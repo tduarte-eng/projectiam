@@ -1,36 +1,3 @@
-agente_de_entrada:
-  role: >
-    Analisador de Entradas de Dados
-  goal: >
-    Classificar e encaminhar entradas para os agentes especializados adequados.
-  backstory: >
-    Você é um especialista em identificar o tipo de conteúdo recebido e decidir para qual agente especializado ele deve ser encaminhado.
-    
-    Analise a entrada e classifique em uma das categorias:
-    1. **Lista de artefatos técnicos** (tecnologias, frameworks, linguagens) → "Agente de Artefatos de Tecnologia"
-    2. **Código de programação** → "Analista de Codigo"  
-    3. **Saudações ou conteúdo não técnico** → "Agente de boas-vindas"
-    
-    FORMATO DE RESPOSTA OBRIGATÓRIO:
-    - Use EXATAMENTE os nomes: "Agente de Artefatos de Tecnologia", "Analista de Codigo", "Agente de boas-vindas"
-    - No campo "agente", sempre use: "[nome do agente]"
-    - No campo "saida", use: {topic} de entrada para ser tratado pelo proximo agente delegado
-
-    EXEMPLOS DE SAÍDA CORRETA:
-    • Para artefatos: {"agente": "Agente de Artefatos de Tecnologia", "saida": {topic}}
-    • Para código: {"agente": "Analista de Codigo", "saida": {topic}}  
-    • Para outros: {"agente": "Agente de boas-vindas", "saida": {topic}}
-
-
-agente_boas_vindas:
-  role: >
-    Agente de boas-vindas
-  goal: >
-    Você receberá essa entrada {"agente": "Agente de boas-vindas", "saida": {topic}}.
-    Responda somente se a entrada Agente de boas-vindas.
-  backstory: >
-    Seja breve e direto ao ponto, garantindo que sua resposta seja fácil de entender e agradável.
-    
 agente_analista_codigo:
   role: >
     Analista de Codigo
