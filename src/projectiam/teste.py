@@ -4,12 +4,56 @@ from litellm import completion
 from pydantic import BaseModel, Field
 from crewai.agent import Agent
 from crewai import Crew, Task
+from crewai.tools import tool
+from crewai_tools import OCRTool, FileWriterTool, MCPServerAdapter
 import asyncio
 from typing import Any, Dict, List
 import json
 
 load_dotenv()
 
+
+server_params_list = [
+    # Streamable HTTP Server
+#    {
+#        "url": "http://127.0.0.1:8000/sse", 
+#        "transport": "streamable-http"
+#    },
+    # SSE Server
+    {
+        "url": "http://127.0.0.1:8081/sse",
+        "transport": "sse"
+    },
+#    {
+#        "url": "http://127.0.0.1:8082/sse",
+#        "transport": "sse"
+#    },
+#    {
+#        "url": "http://127.0.0.1:8083/sse",
+#        "transport": "sse"
+#    }
+]
+
+aggregated_tools = []
+
+try:
+    # O MCPServerAdapter deve ser usado como um gerenciador de contexto ou acessado diretamente
+    # Não use .connect(), use o objeto diretamente ou como context manager
+    mcp_adapter = MCPServerAdapter(server_params_list)
+    
+    # Para obter as ferramentas, use-o como um iterável ou acesse seus atributos
+    # Dependendo da versão da biblioteca, pode ser necessário iterar sobre o objeto
+    # ou acessar um atributo como .tools
+    if hasattr(mcp_adapter, 'tools'):
+        aggregated_tools = mcp_adapter.tools
+    else:
+        # Se não tiver o atributo 'tools', tente usar como iterável
+        aggregated_tools = list(mcp_adapter)
+    
+    print(f"Available aggregated tools: {[getattr(tool, 'name', str(tool)) for tool in aggregated_tools]}")
+except Exception as e:
+    print(f"Error connecting to MCP server: {e}")
+    print("Ensure MCP server is running and accessible with correct configuration.")
 
 class ClassificacaoEntrada(BaseModel):
     agente: str = "" # Nome do agente delegado
@@ -23,6 +67,10 @@ class AnaliseArtefatosState(BaseModel):
 class ArtefatosTecnologiaResponse(BaseModel):
     tabela_categorizacao: str = ""  # A tabela de categorização em formato markdown
     linguagem_analise: str = ""      # Análise técnica da linguagem, se aplicável
+    arquitetura_analise: str = ""   # Análise técnica da arquitetura, se aplicável
+    infraestrutura_analise: str = "" # Análise técnica da infraestrutura, se aplicável
+    banco_dados_analise: str = ""    # Análise técnica do banco de dados, se aplicável
+    devsecops_analise: str = ""      # Análise técnica de DevSecOps, se aplicável
 
 # Create a flow class
 class AnaliseArtefatosFlow(Flow[AnaliseArtefatosState]):
@@ -193,107 +241,260 @@ Java 8, Spring Boot 2.3, MySQL 5.7, Angular 12
             llm=self.model1
         )
 
-#        agente_de_linguagem = Agent(
-#            role="Agente de Linguagens de Programação",
-#            goal="""
-#                Avaliar a modernidade, suporte e práticas associadas às linguagens de programação utilizadas.
-#            """,
-#            backstory="""
-#                Especialista em linguagens de programação, focado em avaliar versões, suporte, frameworks e
-#                práticas de desenvolvimento para garantir a modernidade e eficiência do código. 
-#                Você deve fornecer um relatório técnico detalhado com base na análise da categoria *Linguagem de Programação*.
-#                Você tem acesso ao MCP websearch para pesquisas na WEB.
-#                Ao MCP de funções matemáticas. 
-#                E ao MCP de consultas a banco de dados de desenvolvedores.
-#                """,
-#            verbose=True,
-#            llm=self.model2
-#        )
-
-        categorizar_artefatos_task = Task(
-        description="""
-            Baseado na decisão do agente de entrada: {input},
-            Recebe uma lista de artefatos técnicos, tecnologias, frameworks ou linguagens de programação.
-            Identifique e Categorize os artefatos da *ENTRADA* nas seguintes categorias:
-                - Linguagem de Programação
-                - Arquitetura de Sistemas
-                - Infraestrutura
-                - Banco de Dados
-                - DevSecOps / Governança
-            Inclua-a a versão do Artefato.
-            SEMPRE deve seguir ORDEM de CATEGORIA
-            Não gere recomendações. Não forneça explicações.
-            A saída deve ser uma tabela de categorização conforme o exemplo abaixo:
-                Uma linha por categoria, mesmo que não se aplique.
-                Use "(Nenhum)" na coluna de Artefatos se a categoria não se aplicar.
-            IMPORTANTE: 
-            - Use APENAS \\n (quebra simples) para quebras de linha na tabela
-            - NÃO use \\n\\n (quebra dupla) 
-            - Mantenha sempre as 5 categorias na ordem especificada
-            - Use "(Nenhum)" se não houver artefatos para uma categoria
-            - SEMPRE use os campos CATEGORIA e ARTEFATOS na tabela;""",
-        expected_output="""
-        Usar sempre esse Modelo de Saída (com quebras simples \\n):   
-        | Categoria                 | Artefatos                     |\\n|---------------------------|-------------------------------|\\n| Linguagem de Programação  | Java 11, Java 8, TypeScript   |\\n| Arquitetura de Sistemas   | Jboss, WebSphere v.8.5, nginx |\\n| Infraestrutura            | nginx, Jboss e WebSphere      |\\n| Banco de Dados            | DB2, SQL Server 2016, SQL Server 2019 |\\n| DevSecOps / Governança    | (Nenhum)                      |""",
-        agent=agente_categorizador_de_artefatos,
-        markdown=True,
-        output_pydantic=ArtefatosTecnologiaResponse
+        agente_de_linguagem = Agent(
+            role="Agente de Linguagens de Programação",
+            goal="""
+                Avaliar a modernidade, suporte e práticas associadas às linguagens de programação utilizadas.
+                Fornecer um relatório técnico detalhado com base na análise da categoria *Linguagem de Programação*.""",
+            backstory="""
+                Especialista em linguagens de programação, focado em avaliar versões, suporte, frameworks e
+                práticas de desenvolvimento para garantir a modernidade e eficiência do código. 
+                Você deve fornecer um relatório técnico detalhado com base na análise da categoria *Linguagem de Programação*.
+                """,
+            verbose=True,
+            llm=self.model2
         )
 
-        # analisar_linguagem_task = Task(
-        #     description="""
-        #     Somente Analisar se houver dados do Categorizador de Artefatos.
-        #     Analisar SOMENTE a categoria *Linguagem de programação* e avaliar sua modernidade e maturidade.
-        #     Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há linguagem para analisar.
-        #     Considere os seguintes critérios para a avaliação:
-        #         A versão é LTS?
-        #         Ainda tem suporte? 
-        #         É uma linguagem moderna?
-        #         Possui bibliotecas/frameworks atualizados?
-        #         Há evidências de testes automatizados?
-        #         Há código legado em refatoração?
-        #     Sugira melhorias ou modernizações se necessário.
-        #     Confirme se a versão da linguagem ainda é suportada.""",
-        #     expected_output="""
-        #     Exemplo de análise para Java 11:
-        #     **Java 11**
-        #     ✅ **Modernidade e Suporte**:
-        #     - Java 11 é uma versão estável e amplamente utilizada em ambientes corporativos.
-        #     - Ainda possui suporte oficial da Oracle e da comunidade OpenJDK.
-        #     📚 **Bibliotecas e Frameworks**:
-        #     - O projeto utiliza frameworks modernos como **Spring Boot 2.7**, que é compatível com Java 11.
-        #     - As dependências estão atualizadas via Maven, com controle de versões centralizado.
-        #     🧪 **Testes Automatizados**:
-        #     - Há evidências de testes automatizados com **JUnit 5** e cobertura de código via **JaCoCo**.
-        #     - O pipeline CI inclui etapas de teste e validação antes do deploy.
-        #     🛠️ **Código Legado e Refatoração**:
-        #     - Algumas classes antigas ainda utilizam padrões do Java 8, mas estão sendo gradualmente refatoradas para aproveitar recursos como `var`, `HttpClient` e melhorias de desempenho.
-        #     💡 **Sugestões de melhoria**:
-        #     - Avaliar a migração para **Java 17 LTS**, que oferece melhorias de performance e novos recursos de linguagem.
-        #     - Adotar ferramentas de análise estática como **SonarQube** para reforçar a qualidade do código.
-        #     - Expandir os testes automatizados para incluir testes de integração com banco de dados e APIs externas.""",
-        # agent=agente_de_linguagem,
-        # context=categorizar_artefatos_task,
-        # #output_pydantic=ArtefatosTecnologiaResponse
-        # )
+        agente_de_banco_dados = Agent(
+            role="Agente de Banco de Dados",
+            goal="""
+                Avaliar a modernidade, suporte, segurança e desempenho dos bancos de dados utilizados.
+            """,
+            backstory="""
+                Especialista em bancos de dados, focado em avaliar versões, suporte, segurança e desempenho
+                para garantir a eficiência e confiabilidade dos dados. 
+                Você deve fornecer um relatório técnico detalhado com base na análise da categoria *Banco de Dados*.
+                Considere aspectos como replicação, backup, segurança e tuning de desempenho.
+            """,
+            verbose=True,
+            llm=self.model2
+        )
+
+        agente_integracao = Agent(
+            role="Especialista em Integração de Resultados",
+            goal="Resumir e consolidar todos os resultados das análises anteriores em um único relatório.",
+            backstory="""
+                Você é um especialista em integração de informações técnicas, capaz de sintetizar dados complexos
+                e apresentar um resumo coeso e compreensível. Sua função é garantir que todas as análises anteriores sejam
+                integradas de forma clara e concisa, destacando os pontos mais relevantes para a tomada de decisão. 
+                Utilize uma linguagem técnica apropriada para o público-alvo, garantindo que o relatório final seja útil e informativo. 
+            """,
+            verbose=True,
+            llm=self.model2
+        )
+
+        categorizar_artefatos_task = Task(
+            description="""
+                Baseado na decisão do agente de entrada: {input},
+                Recebe uma lista de artefatos técnicos, tecnologias, frameworks ou linguagens de programação.
+                NÃO INVENTE artefatos que não estejam na *ENTRADA*.
+                Identifique e Categorize os artefatos da *ENTRADA* nas seguintes categorias:
+                    - Linguagem de Programação
+                    - Arquitetura de Sistemas
+                    - Infraestrutura
+                    - Banco de Dados
+                    - DevSecOps / Governança
+                Inclua-a a versão do Artefato.
+                SEMPRE deve seguir ORDEM de CATEGORIA
+                Não gere recomendações. Não forneça explicações.
+                A saída deve ser uma tabela de categorização conforme o exemplo abaixo:
+                    Uma linha por categoria, mesmo que não se aplique.
+                    Use "(Nenhum)" na coluna de Artefatos se a categoria não se aplicar.
+                IMPORTANTE: 
+                - Use APENAS \\n (quebra simples) para quebras de linha na tabela
+                - NÃO use \\n\\n (quebra dupla) 
+                - Mantenha sempre as 5 categorias na ordem especificada
+                - Use "(Nenhum)" se não houver artefatos para uma categoria
+                - SEMPRE use os campos CATEGORIA e ARTEFATOS na tabela;
+                - Saida em tabela_categorizacao
+                """,
+            expected_output="""
+            Usar sempre esse Modelo de Saída (com quebras simples \\n):   
+            | Categoria                 | Artefatos                     |\\n|---------------------------|-------------------------------|\\n| Linguagem de Programação  | Java 11, Java 8, TypeScript   |\\n| Arquitetura de Sistemas   | Jboss, WebSphere v.8.5, nginx |\\n| Infraestrutura            | nginx, Jboss e WebSphere      |\\n| Banco de Dados            | DB2, SQL Server 2016, SQL Server 2019 |\\n| DevSecOps / Governança    | (Nenhum)                      |""",
+            agent=agente_categorizador_de_artefatos,
+            markdown=True,
+            output_pydantic=ArtefatosTecnologiaResponse
+            )
+
+        analisar_linguagem_task = Task(
+            description="""
+                Somente Analisar se houver dados do Categorizador de Artefatos.
+                Analisar SOMENTE a categoria *Linguagem de programação* e avaliar sua modernidade e maturidade.
+                Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há linguagem para analisar.
+                Considere os seguintes critérios para a avaliação:
+                    A versão é LTS?
+                    Ainda tem suporte? 
+                    É uma linguagem moderna?
+                    Possui bibliotecas/frameworks atualizados?
+                    Há evidências de testes automatizados?
+                    Há código legado em refatoração?
+                Sugira melhorias ou modernizações se necessário.
+                Confirme se a versão da linguagem ainda é suportada.
+                Acesse o MCP para buscar informações atualizadas sobre a linguagem, se necessário.
+                Saida em linguagem_analise""",
+            expected_output="""
+                Exemplo de análise para Java 11:
+                
+                ## Linguagem de Programação:
+                ### Java 11
+                ✅ **Modernidade e Suporte**:
+                - Java 11 é uma versão estável e amplamente utilizada em ambientes corporativos.
+                - Ainda possui suporte oficial da Oracle e da comunidade OpenJDK.
+
+                📚 **Bibliotecas e Frameworks**:
+                - O projeto utiliza frameworks modernos como **Spring Boot 2.7**, que é compatível com Java 11.
+                - As dependências estão atualizadas via Maven, com controle de versões centralizado.
+                
+                🧪 **Testes Automatizados**:
+                - Há evidências de testes automatizados com **JUnit 5** e cobertura de código via **JaCoCo**.
+                - O pipeline CI inclui etapas de teste e validação antes do deploy.
+                
+                🛠️ **Código Legado e Refatoração**:
+                - Algumas classes antigas ainda utilizam padrões do Java 8, mas estão sendo gradualmente refatoradas para aproveitar recursos como `var`, `HttpClient` e melhorias de desempenho.
+                
+                💡 **Sugestões de melhoria**:
+                - Avaliar a migração para **Java 17 LTS**, que oferece melhorias de performance e novos recursos de linguagem.
+                - Adotar ferramentas de análise estática como **SonarQube** para reforçar a qualidade do código.
+                - Expandir os testes automatizados para incluir testes de integração com banco de dados e APIs externas.""",
+            agent=agente_de_linguagem,
+            context=[categorizar_artefatos_task],
+            output_pydantic=ArtefatosTecnologiaResponse,
+            markdown=True,
+            tools=aggregated_tools, #No tools allowed
+            async_execution=True
+            )
+
+        analisar_bd_task = Task(
+            description="""
+                Somente Analisar se houver dados do Categorizador de Artefatos.
+                Analisar **SOMENTE** a categoria *Banco de Dados* e avaliar sua modernidade, suporte, segurança e desempenho.
+                Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há banco de dados para analisar.
+                Considere os seguintes critérios para a avaliação:
+                    A versão é atual e suportada?
+                    Possui mecanismos de replicação e backup?
+                    Quais práticas de segurança são aplicadas (criptografia, controle de acesso)?
+                    Há evidências de monitoramento e tuning de desempenho?
+                Sugira melhorias ou modernizações se necessário.
+                Acesse o MCP para buscar informações atualizadas sobre o banco de dados, se necessário.
+                Saida em banco_de_dados_analise.""",
+            expected_output="""
+                Exemplo de análise para PostgreSQL 14:
+                
+                ## Banco de Dados:
+                ### PostgreSQL 14
+
+                ✅ **Modernidade e Suporte**:
+                - A versão 14 do PostgreSQL é estável e suporte encerra-se em novembro de 2026.
+                - Há suporte ativo da comunidade e documentação oficial.
+                
+                🔄 **Replicação e Backup**:
+                - O ambiente utiliza **replicação assíncrona** entre servidores para alta disponibilidade.
+                - Backups são realizados diariamente via `pg_dump` e armazenados em ambiente seguro.
+                
+                🔐 **Segurança**:
+                - A base de dados utiliza **criptografia em repouso** via LUKS no disco.
+                - O acesso é controlado por roles e permissões específicas.
+                - Autenticação via LDAP integrada ao AD corporativo.
+                
+                📈 **Desempenho e Monitoramento**:
+                - Ferramentas como **pg_stat_statements** e **Prometheus + Grafana** são utilizadas para monitoramento.
+                - Há evidências de tuning de queries e índices com base em análise de planos de execução.
+                
+                💡 **Sugestões de melhoria**:
+                - Avaliar a adoção de **PostgreSQL 15 ou superior** para recursos avançados de paralelismo.
+                - Implementar **backup incremental** com ferramentas como `barman` ou `pgBackRest`.
+                - Reforçar a auditoria de acessos com logs centralizados.
+                - Considerar a adoção de **particionamento** para tabelas muito grandes, melhorando desempenho.""",
+            agent=agente_de_banco_dados,
+            context=[categorizar_artefatos_task],
+            output_pydantic=ArtefatosTecnologiaResponse,
+            markdown=True,
+            tools=aggregated_tools, #No tools allowed
+            async_execution=True
+            )
+
+        resumir_resultados_task = Task(
+            description="""
+                Analisar os resultados das tarefas anteriores e gerar um relatório técnico consolidado:
+                Se houver codigo de programação para analisar, gere a análise do código.
+                Se houver artefatos técnicos para categorizar, gere a tabela do categorizador_de_artefatos_task e gere um relatório técnico consolidado.
+                O relatório deve focar em quais categorias o usuario deve focar para ter um indice mais moderno;
+                O relatorio deve ser adequado para um público técnico. Use uma linguagem formal e técnica, evitando jargões desnecessários. 
+            """,
+            expected_output="""
+                # Relatório Técnico de Análise - Sistema S123
+
+                | Categoria                 | Artefatos |
+                |---------------------------|----------|
+                | Linguagem de Programação  | .Net 8, Java 17+, Python 3.11+ |
+                | Arquitetura de Sistemas   | Microservices, Serverless |
+                | Infraestrutura            | AWS, Azure, Docker, Kubernetes |
+                | Banco de Dados            | PostgreSQL, NoSQL |
+                | DevSecOps / Governança    | Terraform, Ansible, GitOps |
+
+                ## Análise de Linguagem de Programação
+                (Conteúdo gerado pelo agente analista_de_artefatos_linguagem)  
+
+                ## Análise de Banco de Dados
+                (Conteúdo gerado pelo agente analista_de_artefatos_banco_dados).""",
+            agent=agente_integracao,
+            context=[analisar_linguagem_task, analisar_bd_task],
+            output_pydantic=ArtefatosTecnologiaResponse,
+            markdown=True,
+            output_file="relatorio_tecnico.md"
+        )
 
         crew = Crew(
            agents=[agente_categorizador_de_artefatos,
-        #           agente_de_linguagem
-           ],
+                   agente_de_linguagem,
+#                   agente_de_sistemas,
+#                   agente_de_infraestrutura,
+                   agente_de_banco_dados,
+#                   agente_de_devsecops
+                   agente_integracao],
            tasks=[categorizar_artefatos_task,
-        #           analisar_linguagem_task
+                   analisar_linguagem_task,
+#                   analisar_sistemas_task,
+#                   analisar_infraestrutura_task,
+                   analisar_bd_task,
+#                   analisar_devsecops_task,
+                   resumir_resultados_task
            ],
            verbose=True
         )
-
-        result = await crew.kickoff_async(inputs={"input": self.state.input})
+        
+        inputs_array = [{'input': self.state.input}]
+        result = await crew.kickoff_async(inputs=inputs_array)
         # Acessando a saída da tarefa
-        tabela_raw = result.pydantic.tabela_categorizacao
-        tabela_formatada = tabela_raw.replace('\n\n', '\n')  # Remove quebras duplas
-        #linguagem_analise = result.pydantic.linguagem_analise
+        
+        
+        #tabela_raw = result.pydantic.tabela_categorizacao
+        #tabela_formatada = tabela_raw.replace('\n\n', '\n')  # Remove quebras duplas
 
-        return tabela_formatada
+        #dados_linguagem_analise = json.loads(analisar_linguagem_task.output.raw)
+        #analise_linguagem = ArtefatosTecnologiaResponse(**dados_linguagem_analise)
+        #linguagem_analise = analise_linguagem.linguagem_analise
+        
+        #tabela_raw = analise_linguagem.tabela_categorizacao
+        #tabela_formatada = tabela_raw.replace('\n\n', '\n')  # Remove quebras duplas
+
+        #dados_banco_dados_analise = json.loads(analisar_bd_task.output.raw)
+        #analise_banco_dados = ArtefatosTecnologiaResponse(**dados_banco_dados_analise)
+        #banco_de_dados_analise = analise_banco_dados.banco_dados_analise
+
+        print("################## \n Resultado Completo:\n", result)
+        for res in result:
+            dados = AnaliseArtefatosFlow.parse_result(res)
+            tabela_formatada = dados.get("tabela_categorizacao", "").replace('\n\n', '\n')
+            linguagem_analise = dados.get("linguagem_analise", "")
+            banco_de_dados_analise = dados.get("banco_dados_analise", "")
+
+        print("################## \n Tabela de Categorização:\n", tabela_formatada)
+        print("################## \n Análise de Linguagem:\n", linguagem_analise)
+        print("################## \n Análise de Banco de Dados:\n", banco_de_dados_analise)
+        print(crew.usage_metrics)
+
+        return (f"{tabela_formatada}\n\n  {linguagem_analise} \n\n {banco_de_dados_analise}")
 
 
     @listen("Agente de Codigo")
