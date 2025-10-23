@@ -4,13 +4,14 @@ import warnings
 import os
 import tempfile
 import streamlit as st
+import time
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from datetime import datetime
 from loaders import *
 from langchain_community.chat_message_histories import ChatMessageHistory
 #from crew_inicial import Crew_inicial
-from teste  import AnaliseArtefatosFlow, run_flow
+from teste  import AnaliseArtefatosFlow, run_flow, set_status_callback
 import asyncio
 #from crew_analise2 import Project_2
 
@@ -19,8 +20,8 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 load_dotenv()
 
 # Variáveis obrigatórias para Azure OpenAI
-api_key = os.getenv("AZURE_API_KEY")
-api_base = os.getenv("AZURE_API_BASE")
+api_key = os.getenv("AZURE_API_KEY2")
+api_base = os.getenv("AZURE_API_BASE2")
 api_version = os.getenv("AZURE_API_VERSION")
 #model_name = os.getenv("OPENAI_MODEL_NAME")
 
@@ -79,38 +80,123 @@ def carrega_varios_arquivos(tipo_arquivo, arquivos):
     return "\n\n".join(conteudos)
 
 def chamar_crew(api_key, model_name, mensagens, max_tokens=10000, temperature=1.0, top_p=1.0):
-    #api_key = os.getenv("AZURE_API_KEY")
-    print(api_key, model_name, api_base, api_version, max_tokens, temperature, top_p)
-    # Prepara os inputs para o fluxo
-    topic = ""
-    if isinstance(mensagens, list):
-        # Extrai o conteúdo de todas as mensagens em um único texto
-        for nome, conteudo in mensagens:
-            topic += f"\n[{nome}]: {conteudo}"
-    else:
-        # Se for apenas uma string, usa diretamente
-        topic = mensagens
+    """
+    Função modificada para incluir informativos visuais durante o processamento
+    """
     
-    # Prepara os inputs no formato esperado por run_flow
-    topic = {
-        'input': topic
-        #        'current_year': str(datetime.now().year)
-    }
+    #st.session_state['processando'] = True
+
+
+    # Cria containers para status dinâmico
+    status_container = st.empty()
+    progress_bar = st.progress(0)
+    details_container = st.empty()
     
-    # Configura o fluxo de análise com as credenciais e parâmetros
-    AnaliseArtefatosFlow.configure(
-        api_key=api_key,
-        api_base=api_base,
-        api_version=api_version,
-        model_name=model_name,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p
-    )
+    # Define callback para receber atualizações do teste.py
+    def status_callback(message: str, progress: int):
+        status_container.info(message)
+        progress_bar.progress(progress)
+        
+        # Adiciona detalhes específicos baseados no progresso
+        if progress == 15:
+            time.sleep(1)
+            details_container.markdown("""
+            **🔍 Classificação de Entrada:**
+            - Identificando tipo de conteúdo
+            - Determinando agente especializado
+            """)
+        elif progress == 40:
+            time.sleep(1)
+            details_container.markdown("""
+            **📊 Categorização em Andamento:**
+            - Linguagem de Programação
+            - Arquitetura de Sistemas  
+            - Infraestrutura
+            - Banco de Dados
+            - DevSecOps / Governança
+            """)
+        elif progress == 65:
+            time.sleep(1)
+            details_container.markdown("""
+            **🔬 Análises Especializadas:**
+            - ✅ Linguagens avaliadas
+            - ✅ Sistemas analisados
+            - 🔄 Infraestrutura em análise
+            - ⏳ Banco de dados pendente
+            - ⏳ DevSecOps pendente
+            """)
+        elif progress == 85:
+            time.sleep(1)
+            details_container.markdown("""
+            **🔒 Finalizando Análises:**
+            - ✅ Linguagens concluídas
+            - ✅ Sistemas concluídos
+            - ✅ Infraestrutura concluída
+            - ✅ Banco de dados concluído
+            - 🔄 DevSecOps em análise
+            """)
+        elif progress >= 95:
+            time.sleep(1)
+            details_container.markdown("""
+            **📈 Consolidação Final:**
+            - ✅ Todas as análises concluídas
+            - 🔄 Gerando relatório técnico
+            - 📊 Calculando métricas de modernidade
+            """)
     
-    # Executa o fluxo diretamente com os inputs
-    resposta = asyncio.run(run_flow(topic))
-    return resposta
+    try:
+        # Configura o callback no teste.py
+        set_status_callback(status_callback)
+        
+        # Fase inicial: Preparação
+        status_container.info("🔄 **Preparando análise:** Configurando agentes especializados...")
+        progress_bar.progress(5)
+        
+        # Processa as mensagens
+        topic = ""
+        if isinstance(mensagens, list):
+            for nome, conteudo in mensagens:
+                topic += f"\n[{nome}]: {conteudo}"
+        else:
+            topic = mensagens
+        
+        topic = {'input': topic}
+        
+        # Configura o fluxo
+        AnaliseArtefatosFlow.configure(
+            api_key=api_key,
+            api_base=api_base,
+            api_version=api_version,
+            model_name=model_name,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p
+        )
+        
+        # Executa o fluxo (que agora enviará atualizações via callback)
+        resposta = asyncio.run(run_flow(topic))
+        
+        # Sucesso final
+        status_container.success("✅ **Análise concluída!** Relatório técnico gerado com sucesso.")
+        details_container.empty()
+        
+        # Remove elementos após delay
+        time.sleep(1)
+        status_container.empty()
+        progress_bar.empty()
+        
+        return resposta
+        
+    except Exception as e:
+        status_container.error(f"❌ **Erro durante processamento:** {str(e)}")
+        progress_bar.empty()
+        details_container.empty()
+        st.error("Falha na análise. Verifique os logs para mais detalhes.")
+        return f"Erro durante processamento: {str(e)}"
+    finally:
+        # Limpa o callback
+        set_status_callback(None)
+#        st.session_state['processando'] = False
 
 def pagina_chat():
     st.header('🤖 Bem-vindo ao IAM (IA de Modernização)', divider=True)
@@ -119,6 +205,10 @@ def pagina_chat():
     api_key = st.session_state.get('api_key')
     system_message = st.session_state.get('system_message')
     documento = st.session_state.get('documento', None)  # Novo: guarda o texto do documento
+
+    # Inicializa o estado de processamento se não existir
+    if 'processando' not in st.session_state:
+        st.session_state['processando'] = False
 
     if not all([modelo, system_message]):
         st.error('Carregue o Oráculo primeiro.')
@@ -129,52 +219,82 @@ def pagina_chat():
         chat = st.chat_message(mensagem.type)
         chat.markdown(mensagem.content)
 
-    input_usuario = st.chat_input('Fale com o Oráculo')
-    if input_usuario:
-        chat = st.chat_message('human')
-        chat.markdown(input_usuario)
 
-        # Se houver vários documentos/sites, processe cada um individualmente
-        documentos = []
-        contador = 1
-        if documento:
-            # Espera-se que documento seja uma string grande, separe por marcador ou adapte para lista de tuplas (nome, conteudo)
-            # Exemplo de separação simples:
-            for bloco in documento.split('---DOCUMENTO---'):
-                if bloco.strip():
-                    nome = f"documento{contador}"
-                    conteudo = bloco.strip()
-                    documentos.append((nome, conteudo))
-                    contador = contador + 1
-  
-        else:
-            documentos = []
+    # Exibe mensagem informativa quando está processando
+    if st.session_state['processando']:
+        st.info("🔄 **Processamento em andamento...** Por favor, aguarde a conclusão da análise.")
+        st.chat_input(placeholder="Aguarde o processamento atual terminar...", disabled=True)
+    
+        # Container para exibir o processamento em tempo real
+        processing_container = st.container()
+        with processing_container:
+            st.markdown("### 🔄 **Status do Processamento**")   
+    
+    
+    else:
+        input_usuario = st.chat_input(placeholder='Fale com o Oráculo')
         
-        documentos.append(("InputUsuario", input_usuario))
-
-        for nome, conteudo in documentos:
-            print(f"Nome: {nome}\nConteudo:\n{conteudo}\n{'-'*40}")
-
-        if documentos:
-            resposta = chamar_crew(api_key, modelo, documentos)
-        else:
-            resposta = chamar_crew(input_usuario)
+        if input_usuario:
+            # IMEDIATAMENTE define o estado como processando e força rerun
+            st.session_state['processando'] = True
             
-        # Junta a entrada do usuário com o texto do documento, se houver
-#        if documento and not documento.strip().lower().startswith("erro ao carregar o site"):
-#            entrada = f"{input_usuario}\n\n[Conteúdo do documento/site]:\n{documento}"
-#        else:
-#            entrada = input_usuario
+            # Adiciona a mensagem do usuário ao chat
+            chat = st.chat_message('human')
+            chat.markdown(input_usuario)
+            
+            # Adiciona à memória
+            memoria = st.session_state.get('memoria', MEMORIA)
+            memoria.add_user_message(input_usuario)
+            st.session_state['memoria'] = memoria
+            
+            # Força a atualização da interface para mostrar o estado de processamento
+            st.rerun()
 
-#        resposta = processar_com_crew(entrada)
-#        st.write("Saida:", resposta)  # <-- Aqui sim, mostra na interface
-        chat = st.chat_message('ai')
-        chat.markdown(resposta)
+    # Processamento real - só executa quando há input pendente
+    if st.session_state['processando'] and 'input_pendente' not in st.session_state:
+        # Recupera a última mensagem do usuário
+        memoria = st.session_state.get('memoria', MEMORIA)
+        if memoria.messages and memoria.messages[-1].type == 'human':
+            input_usuario = memoria.messages[-1].content
+            
+            # Processa documentos
+            documentos = []
+            contador = 1
+            if documento:
+                for bloco in documento.split('---DOCUMENTO---'):
+                    if bloco.strip():
+                        nome = f"documento{contador}"
+                        conteudo = bloco.strip()
+                        documentos.append((nome, conteudo))
+                        contador = contador + 1
+            else:
+                documentos = []
+            
+            documentos.append(("InputUsuario", input_usuario))
 
-        memoria.add_user_message(input_usuario)
-        memoria.add_ai_message(resposta)
-        st.session_state['memoria'] = memoria
-
+            # Executa o processamento
+            try:
+                if documentos:
+                    resposta = chamar_crew(api_key, modelo, documentos)
+                else:
+                    resposta = chamar_crew(api_key, modelo, input_usuario)
+                    
+                # Mostra a resposta
+                chat = st.chat_message('ai')
+                chat.markdown(resposta)
+                
+                # Adiciona à memória
+                memoria.add_ai_message(resposta)
+                st.session_state['memoria'] = memoria
+                
+            except Exception as e:
+                st.error(f"Erro durante o processamento: {str(e)}")
+                
+            finally:
+                # SEMPRE libera o estado de processamento
+                st.session_state['processando'] = False
+                # Força atualização para liberar o input
+                st.rerun()
 
 # Sidebar
 def sidebar():

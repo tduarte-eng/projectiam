@@ -1,0 +1,321 @@
+categorizar_artefatos_task:
+  description: >
+    Baseado na decisão do agente de entrada: {input},
+    Recebe uma lista de artefatos técnicos, tecnologias, frameworks ou linguagens de programação.
+    NÃO INVENTE artefatos que não estejam na *ENTRADA*.
+    Identifique e Categorize os artefatos da *ENTRADA* nas seguintes categorias:
+        - Linguagem de Programação
+        - Arquitetura de Sistemas
+        - Infraestrutura
+        - Banco de Dados
+        - DevSecOps / Governança
+    Inclua-a a versão do Artefato.
+    SEMPRE deve seguir ORDEM de CATEGORIA
+    Não gere recomendações. Não forneça explicações.
+    A saída deve ser uma tabela de categorização conforme o exemplo abaixo:
+        Uma linha por categoria, mesmo que não se aplique.
+        Use "(Nenhum)" na coluna de Artefatos se a categoria não se aplicar.
+    IMPORTANTE: 
+    - Use APENAS \n (quebra simples) para quebras de linha na tabela
+    - NÃO use \n\n (quebra dupla) 
+    - Mantenha sempre as 5 categorias na ordem especificada
+    - Use "(Nenhum)" se não houver artefatos para uma categoria
+    - SEMPRE use os campos CATEGORIA e ARTEFATOS na tabela;
+    - Saida em tabela_categorizacao
+  expected_output: >
+    Usar sempre esse Modelo de Saída (com quebras simples \n):   
+    | Categoria                 | Artefatos                     |\n|---------------------------|-------------------------------|\n| Linguagem de Programação  | Java 11, Java 8, TypeScript   |\n| Arquitetura de Sistemas   | Jboss, WebSphere v.8.5, nginx |\n| Infraestrutura            | nginx, Jboss e WebSphere      |\n| Banco de Dados            | DB2, SQL Server 2016, SQL Server 2019 |\n| DevSecOps / Governança    | (Nenhum)                      |
+  agent: agente_categorizador_de_artefatos
+
+analisar_linguagem_task:
+  description: >
+    Somente Analisar se houver dados do Categorizador de Artefatos.
+    Analisar SOMENTE a categoria *Linguagem de programação* e avaliar sua modernidade e maturidade.
+    Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há linguagem para analisar.
+    Considere os seguintes critérios para a avaliação:
+        A versão é LTS?
+        Ainda tem suporte? 
+        É uma linguagem moderna?
+        Possui bibliotecas/frameworks atualizados?
+        Há evidências de testes automatizados?
+        Há código legado em refatoração?
+    Sugira melhorias ou modernizações se necessário.
+    Confirme se a versão da linguagem ainda é suportada.
+    Gere uma metrica de modernidade de 0 a 10.
+    Acesse o MCP para buscar informações atualizadas sobre a linguagem, se necessário.
+    Saida em linguagem_analise
+  expected_output: >
+    Exemplo de análise para Java 11:
+    
+    
+    ## Linguagem de Programação:
+    ### Java 11
+    ✅ **Modernidade e Suporte**:
+    - Java 11 é uma versão estável e amplamente utilizada em ambientes corporativos.
+    - Ainda possui suporte oficial da Oracle e da comunidade OpenJDK.
+    
+    
+    📚 **Bibliotecas e Frameworks**:
+    - O projeto utiliza frameworks modernos como **Spring Boot 2.7**, que é compatível com Java 11.
+    - As dependências estão atualizadas via Maven, com controle de versões centralizado.
+    
+    
+    🧪 **Testes Automatizados**:
+    - Há evidências de testes automatizados com **JUnit 5** e cobertura de código via **JaCoCo**.
+    - O pipeline CI inclui etapas de teste e validação antes do deploy.
+    
+    
+    🛠️ **Código Legado e Refatoração**:
+    - Algumas classes antigas ainda utilizam padrões do Java 8, mas estão sendo gradualmente refatoradas para aproveitar recursos como `var`, `HttpClient` e melhorias de desempenho.
+    
+    
+    💡 **Sugestões de melhoria**:
+    - Avaliar a migração para **Java 17 LTS**, que oferece melhorias de performance e novos recursos de linguagem.
+    - Adotar ferramentas de análise estática como **SonarQube** para reforçar a qualidade do código.
+    - Expandir os testes automatizados para incluir testes de integração com banco de dados e APIs externas.
+  agent: agente_de_linguagem
+  context:
+    - categorizar_artefatos_task
+
+analisar_sistemas_task:
+  description: >
+    Somente Analisar se houver dados do Categorizador de Artefatos.
+    Analisar SOMENTE a categoria *Arquitetura de Sistemas* e avaliar sua modernidade e maturidade.
+    Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há arquitetura para analisar.
+    Considere os seguintes critérios para a avaliação:
+        A arquitetura é monolítica, modular ou baseada em microsserviços?
+        Utiliza padrões modernos de design (ex: REST, event-driven)?
+        Há evidências de escalabilidade e resiliência?
+        Está preparada para nuvem (cloud-native)?
+    Sugira melhorias ou modernizações se necessário.
+    Gere uma metrica de modernidade de 0 a 10.
+    Acesse o MCP para buscar informações atualizadas sobre arquitetura, se necessário.
+    Saida em arquitetura_analise.
+  expected_output: >
+    Exemplo de análise para Arquitetura Monolítica:
+    ## Arquitetura de Sistemas:
+    ### Arquitetura Monolítica
+    ❌ **Modernidade e Escalabilidade**:
+    - A arquitetura monolítica pode limitar a escalabilidade horizontal e a agilidade no desenvolvimento.
+    - Considerar a adoção de uma arquitetura baseada em microsserviços para melhorar a modularidade e escalabilidade.
+    ⚙️ **Padrões de Design**:
+    - Atualmente, a aplicação utiliza APIs REST, o que é positivo.
+    - Avaliar a introdução de padrões event-driven para melhorar a reatividade e resiliência.
+    ☁️ **Preparação para Nuvem**:
+    - A aplicação não é totalmente cloud-native, o que pode dificultar a migração para ambientes em nuvem.
+    - Recomenda-se a adoção de contêineres (Docker) e orquestração (Kubernetes) para facilitar a implantação em nuvem.
+    💡 **Sugestões de melhoria**:
+    - Iniciar um plano de migração gradual para microsserviços, começando pelos módulos mais críticos.
+    - Implementar práticas de DevOps para acelerar o ciclo de desenvolvimento e implantação.
+    - Avaliar o uso de plataformas de nuvem como AWS, Azure ou GCP para aproveitar serviços gerenciados e escalabilidade automática.
+  agent: agente_de_sistemas
+  context:
+    - categorizar_artefatos_task
+
+analisar_infraestrutura_task:
+  description: >
+    Somente Analisar se houver dados do Categorizador de Artefatos.
+    Analisar SOMENTE a categoria *Infraestrutura* e avaliar sua modernidade e maturidade.
+    Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há infraestrutura para analisar.
+    Considere os seguintes critérios para a avaliação:
+        A infraestrutura é on-premises, cloud ou híbrida?
+        Utiliza contêineres e orquestração (ex: Docker, Kubernetes)?
+        Há evidências de automação (ex: IaC, CI/CD)?
+        Possui monitoramento e logging adequados?
+    Sugira melhorias ou modernizações se necessário.
+    Gere uma metrica de modernidade de 0 a 10.
+    Acesse o MCP para buscar informações atualizadas sobre infraestrutura, se necessário.
+    Saida em infraestrutura_analise.
+  expected_output: >
+    Exemplo de análise para Infraestrutura On-Premises:
+    ## Infraestrutura:
+    ### Infraestrutura On-Premises
+    ⚠️ **Modernidade e Flexibilidade**:
+    - A infraestrutura on-premises pode limitar a escalabilidade e agilidade.
+    - Considerar a adoção de uma estratégia híbrida ou migração para nuvem para aproveitar a elasticidade e serviços gerenciados.
+    🐳 **Contêineres e Orquestração**:
+    - Adoção de contêineres (ex: Docker) e orquestração (ex: Kubernetes) pode melhorar a portabilidade e escalabilidade.
+    - Implementar práticas de CI/CD para automação de testes e implantações.
+    ⚙️ **Automação**:
+    - Utilização de Infrastructure as Code (IaC) com ferramentas como Terraform ou Ansible pode aumentar a eficiência e reduzir erros manuais.
+    - Automatizar processos de provisionamento e configuração.
+    📊 **Monitoramento e Logging**:
+    - Implementar soluções de monitoramento (ex: Prometheus, Grafana) para visibilidade em tempo real.
+    - Centralizar logs com ferramentas como ELK Stack ou Splunk para facilitar a análise.
+    💡 **Sugestões de melhoria**:
+    - Avaliar a migração para uma solução de nuvem pública (AWS, Azure, GCP) para maior flexibilidade.
+    - Adotar práticas de DevOps para acelerar o ciclo de desenvolvimento e implantação.
+    - Investir em segurança da infraestrutura, incluindo firewalls, VPNs e políticas de acesso.
+  agent: agente_de_infraestrutura
+  context:
+    - categorizar_artefatos_task
+
+analisar_bd_task:
+  description: >
+    Somente Analisar se houver dados do Categorizador de Artefatos.
+    Analisar **SOMENTE** a categoria *Banco de Dados* e avaliar sua modernidade, suporte, segurança e desempenho.
+    Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há banco de dados para analisar.
+    Considere os seguintes critérios para a avaliação:
+        A versão é atual e suportada?
+        Possui mecanismos de replicação e backup?
+        Quais práticas de segurança são aplicadas (criptografia, controle de acesso)?
+        Há evidências de monitoramento e tuning de desempenho?
+    Sugira melhorias ou modernizações se necessário.
+    Gere uma metrica de modernidade de 0 a 10.
+    Acesse o MCP para buscar informações atualizadas sobre o banco de dados, se necessário.
+    Saida em banco_de_dados_analise.
+  expected_output: >
+    Exemplo de análise para PostgreSQL 14:
+    
+    
+    ## Banco de Dados:
+    ### PostgreSQL 14
+    
+    
+    ✅ **Modernidade e Suporte**:
+    - A versão 14 do PostgreSQL é estável e suporte encerra-se em novembro de 2026.
+    - Há suporte ativo da comunidade e documentação oficial.
+    
+    
+    🔄 **Replicação e Backup**:
+    - O ambiente utiliza **replicação assíncrona** entre servidores para alta disponibilidade.
+    - Backups são realizados diariamente via `pg_dump` e armazenados em ambiente seguro.
+    
+    
+    🔐 **Segurança**:
+    - A base de dados utiliza **criptografia em repouso** via LUKS no disco.
+    - O acesso é controlado por roles e permissões específicas.
+    - Autenticação via LDAP integrada ao AD corporativo.
+    
+    
+    📈 **Desempenho e Monitoramento**:
+    - Ferramentas como **pg_stat_statements** e **Prometheus + Grafana** são utilizadas para monitoramento.
+    - Há evidências de tuning de queries e índices com base em análise de planos de execução.
+    
+    
+    💡 **Sugestões de melhoria**:
+    - Avaliar a adoção de **PostgreSQL 15 ou superior** para recursos avançados de paralelismo.
+    - Implementar **backup incremental** com ferramentas como `barman` ou `pgBackRest`.
+    - Reforçar a auditoria de acessos com logs centralizados.
+    - Considerar a adoção de **particionamento** para tabelas muito grandes, melhorando desempenho.
+  agent: agente_de_banco_dados
+  context:
+    - categorizar_artefatos_task
+
+analisar_devsecops_task:
+  description: >
+    Somente Analisar se houver dados do Categorizador de Artefatos.
+    Analisar SOMENTE a categoria *DevSecOps / Governança* e avaliar sua modernidade e maturidade.
+    Se a categoria possuir campo vazio ou "(Nenhum)", responda que não há DevSecOps para analisar.
+    Considere os seguintes critérios para a avaliação:
+        Quais ferramentas de CI/CD são utilizadas?
+        Há práticas de segurança integradas no pipeline (ex: SAST, DAST)?
+        Utiliza Infrastructure as Code (IaC)?
+        Há evidências de monitoramento e compliance?
+    Sugira melhorias ou modernizações se necessário.
+    Gere uma metrica de modernidade de 0 a 10.
+    Acesse o MCP para buscar informações atualizadas sobre DevSecOps, se necessário.
+    Saida em devsecops_analise.
+  expected_output: >
+    Exemplo de análise para Jenkins e GitLab CI:
+    ## DevSecOps / Governança:
+    ### Jenkins e GitLab CI
+    ✅ **Ferramentas de CI/CD**:
+    - O uso combinado de Jenkins e GitLab CI oferece flexibilidade e robustez no pipeline de integração e entrega contínua.
+    - Jenkins é utilizado para builds complexos, enquanto GitLab CI é integrado ao repositório Git para automação de testes e deploy.
+    🔒 **Práticas de Segurança**:
+    - Integração de ferramentas SAST e DAST no pipeline para identificação de vulnerabilidades.
+    - Uso de variáveis de ambiente para gerenciamento seguro de credenciais.
+    - Implementação de controles de acesso baseados em função (RBAC) no GitLab.
+    📦 **Infrastructure as Code (IaC)**:
+    - Utilização de Terraform para provisionamento de infraestrutura em nuvem.
+    - Armazenamento de configurações em repositórios Git para versionamento.
+    📊 **Monitoramento e Compliance**:
+    - Implementação de monitoramento de logs com ELK Stack.
+    - Auditoria de acessos e mudanças em infraestrutura.
+    💡 **Sugestões de melhoria**:
+    - Avaliar a adoção de ferramentas de IaC para maior consistência e reprodutibilidade.
+    - Implementar testes automatizados para validação de segurança em cada etapa do pipeline.
+    - Reforçar a cultura DevSecOps com treinamentos e workshops para a equipe.
+    - Considerar a adoção de ferramentas de orquestração de containers como Kubernetes para maior escalabilidade.
+  agent: agente_de_devsecops
+  context:
+    - categorizar_artefatos_task
+
+resumir_resultados_task:
+  description: >
+    Analisar os resultados das tarefas anteriores e gerar um relatório técnico consolidado:
+    Se houver codigo de programação para analisar, gere a análise do código.
+    Se houver artefatos técnicos para categorizar, gere a tabela do categorizador_de_artefatos_task e gere um relatório técnico consolidado.
+    O relatório deve focar em quais categorias o usuario deve focar para ter um indice mais moderno;
+    O relatorio deve ser adequado para um público técnico. Use uma linguagem formal e técnica, evitando jargões desnecessários.
+    A Análise é por categoria.
+  expected_output: >
+    # Relatório Técnico de Análise - Sistema S123
+    
+    
+    | Categoria                 | Artefatos | Modernidade (0-10) |
+    |---------------------------|----------|    --------------------|    
+    | Linguagem de Programação  | java 11, java 8, Typescript |  7 |
+    | Arquitetura de Sistemas   | Jboss, WebSphere 8.5, nginx |   4 |
+    | Infraestrutura            | nginx, Jboss, WebSphere |  3.5  |
+    | Banco de Dados            | DB2, SQL SERVER 2016, SQL SERVER 2019 |       7.3 |       
+    | DevSecOps / Governança    | (NENHUM) |  0 |
+    
+    
+    ### Análise de Linguagem de Programação
+    Modernidade: 7/10
+    
+    
+    - Java 11 e Java 8: ambas estão em modo EOL (End of Life), ou seja, fora do ciclo oficial de suporte público. Seu uso implica riscos elevados de segurança, limitações de compatibilidade com frameworks modernos e tendência de problemas com inovação e compliance regulatório. Recomenda-se migração imediata para versões oficialmente suportadas, como Java 17 LTS ou superior.
+    - TypeScript: ponto positivo na stack, pois é referência para aplicações modernas em front-end e fullstack, porém a ausência de backends atualizados limita o ganho. Adotar TypeScript nas versões mais recentes e associá-lo a soluções serverless ou microsserviços pode elevar consideravelmente a modernidade da categoria.
+    Sugestão principal: Priorizar a atualização de todas as bases Java para release LTS vigente e atrelar práticas de CI/CD modernas com cobertura de testes automatizados e ferramentas de qualidade, como SonarQube.
+    
+    
+    ### Análise de Banco de Dados
+    Modernidade: 7.3/10
+    
+    -DB2 (12.x): bastante avançado, moderno, com recursos de AI e cloud, métricas robustas de segurança, replicação e monitoramento. Ideal avaliar uso de serviços gerenciados na nuvem.
+    -SQL Server 2016: próximo do fim do suporte estendido, limita uso de recursos e integridade. Sugestão de migração imediata para SQL Server 2019 ou superior.
+    -SQL Server 2019: atualizado, seguro, escalável e preparado para ambientes híbridos/cloud. Recomenda-se futura atualização para SQL Server 2022.
+    Média da categoria é razoável; migrar instâncias defasadas e integrar ferramentas de auditoria e automação para maior modernidade e segurança.
+    
+    
+    ### Análise de Arquitetura de Sistemas
+    Modernidade: 4/10
+    
+    -JBoss e WebSphere v.8.5: uso demonstra predominância de arquitetura tradicional monolítica, com limitação de escalabilidade e alto risco operacional/legado. WebSphere 8.5 encontra-se amplamente considerado obsoleto no mercado, com desafios para integrações e evolução.
+    -nginx: elemento positivo como proxy e balanceador, permite modernizações rápidas se integrado a práticas de containerização e cloud.
+    Não há evidências concretas de uso disseminado de containers, orquestração ou padrões de microsserviços/aplicações cloud-native. Recomenda-se investimento na refatoração da arquitetura, priorizando microsserviços, containers (Docker), orquestração (Kubernetes) e componentes open-source.
+    Principal foco de modernização: transição arquitetural para cloud-native, adoção progressiva de microsserviços, automação e APIs modernas.
+    
+    ### Análise de Infraestrutura
+    Modernidade: 3.5/10
+    Predomina ambiente tradicional (on-premises ou virtualizado) com servidores de aplicação convencionais e nginx, sem indícios de cloud, containerização ou automação avançada.
+    Ausência de práticas de Infrastructure as Code (IaC), automação CI/CD, monitoramento proativo e orquestração indica lacunas em escalabilidade e agilidade operacional.
+    Recomendação: evoluir para infraestrutura baseada em containers (Docker), orquestrada por Kubernetes, com automação (Terraform, Ansible) e monitoramento/logging centralizado (Prometheus, Grafana, ELK/Splunk).
+    Grande oportunidade de ganho ao migrar ambiente para arquitetura híbrida ou cloud, elevando fortemente o índice de modernidade da categoria.
+    
+    ### Análise de DevSecOps / Governança
+    Modernidade: 0/10
+    Não há artefatos, práticas ou ferramentas DevSecOps/governança implementados ou catalogados.
+    Forte lacuna em segurança, automação, compliance e rastreabilidade.
+    Recomendação: iniciar imediatamente esforços para adoção de DevSecOps com integração de pipelines CI/CD, automação de segurança (SAST/DAST), práticas de Infrastructure as Code (Terraform/Ansible), monitoramento contínuo e controles de auditoria/governança. Implementação acelerada de DevSecOps elevará substancialmente o índice de maturidade e modernidade do ecossistema.
+    Resumo executivo para tomada de decisão:
+
+    ### Para alcançar índices de modernidade competitivos, recomenda-se foco prioritário em:
+
+    Migração das linguagens e frameworks para versões LTS suportadas e integração de ferramentas modernas.
+    Evolução arquitetural em direção a microsserviços, containers e cloud-native, abandonando servidores de aplicação legados.
+    Iniciativas de automação, monitoramento e logging centralizado na infraestrutura, com IaC e DevOps.
+    Atualização automática e fortalecimento de segurança/auditoria dos bancos de dados com integração cloud onde possível.
+    Implementação acelerada de práticas e ferramentas DevSecOps, integrando segurança, compliance e entrega contínua ponta-a-ponta.
+    Estas ações devem ser acompanhadas por avaliação de débitos técnicos, parcerias estratégicas e capacitação da equipe em tecnologias de cloud, containers, automação e segurança.                """,
+  agent: agente_integracao
+  context:
+    - analisar_linguagem_task
+    - analisar_sistemas_task
+    - analisar_infraestrutura_task
+    - analisar_bd_task
+    - analisar_devsecops_task
+    - categorizar_artefatos_task
